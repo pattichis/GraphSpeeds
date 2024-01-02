@@ -37,6 +37,9 @@ import pandas as pd
 from IPython.display import HTML
 from base64 import b64encode
 
+# Import functions and library
+import moviepy.editor
+from moviepy.editor import VideoFileClip, vfx
 
 
 def f(m, b):
@@ -271,6 +274,7 @@ class cuteGraph:
       """ saveImage(filename) saves filename.ext where ext=png, jpeg, svg, pdf
       """
       self.fig.write_image(filename, engine="kaleido", scale=1.0)
+      print("wrote ", filename)
 
     # String representation for print() and debugging
     def __repr__(self) -> str:
@@ -302,7 +306,8 @@ class cuteGraph:
     def setY(self, minY, maxY):
       """ sets minimum and maximum integer values for Y.
       """
-      height = (maxY - minY + self.step) / self.step * self.stepPixels
+      # height = (maxY - minY + self.step) / self.step * self.stepPixels
+      height = (maxY - minY) / self.step * self.stepPixels
       if (height <= 2048):
         self.minY  = minY
         self.maxY  = maxY
@@ -347,7 +352,7 @@ class cuteGraph:
       self.line_width  = linewidth
       self.point_width = pointwidth
 
-    def setupGrid(self, xdigits=3, xdecimals=0, ydigits=3, ydecimals=0, grid_color='red'):
+    def setupGrid(self, xdigits=3, xdecimals=0, ydigits=3, ydecimals=0, grid_color='green'):
       """ builds the grid using grid_color.
       """
 
@@ -367,12 +372,14 @@ class cuteGraph:
       self.fig.update_yaxes(range=[minY, maxY],
                             showgrid=self.gridDisplay,
                             gridwidth=1,
+                            linewidth=1,
                             gridcolor=grid_color,
                             scaleanchor = "x", scaleratio = 1,
                             automargin=False)
       self.fig.update_xaxes(range=[minX, maxX],
                             showgrid=self.gridDisplay,
                             gridwidth=1,
+                            linewidth=1,
                             gridcolor=grid_color,
                             automargin=False)
 
@@ -394,8 +401,8 @@ class cuteGraph:
 
       # Plot the two axes and add tick points:
       if (self.axisVis):
-        self.fig.add_hline(y=0.0) # x-axis
-        self.fig.add_vline(x=0.0) # y-axis
+        self.fig.add_hline(y=0.0, line_width=5, line_color='black') # x-axis
+        self.fig.add_vline(x=0.0, line_width=5, line_color='black') # y-axis
 
       # Update
       # self.fig.show()
@@ -562,13 +569,6 @@ class cuteGraph:
           line=dict(color=line_color, width=self.line_width)))
 
 
-def timer(seconds):
-    # Increase to delay the loop
-    watch_speed_factor = 2
-    
-    adjusted_seconds = seconds / watch_speed_factor
-    time.sleep(adjusted_seconds)
-    
 class table(cuteGraph):
   def __init__(self, x = None, y = None, 
                img_path = None, img_loc = None, 
@@ -625,6 +625,12 @@ class table(cuteGraph):
     else:
       self.img_speed = 0
   
+  def saveImage(self, filename):
+      """ saveImage(filename) saves filename.ext where ext=png, jpeg, svg, pdf
+      """
+      self.fig.write_image(filename, engine="kaleido", scale=1.0)
+      print("Wrote ", filename)
+      
   def plotTable(self):
       """ plots a table from given columns
       """
@@ -643,12 +649,16 @@ class table(cuteGraph):
       # Update the figure:
       self.fig.show()
   
-
-def plotTablesLines(tables = None, fig_title = 
-                    None, x_label = None, y_label = None, 
+def plotTablesLines(tables = None, 
+                    fig_title = None, x_label = None, y_label = None, 
                     legend_title = None, legend_labels = None,
-                    equation_labels = None):
+                    equation_labels = None,
+                    minX = None, minY = None, maxX = None, maxY = None, 
+                    step = 5, stepPixels = 50,
+                    img_name = None):
     """ plots a table as plot from given columns
+        Optional:
+          Can setup the step, minX, maxX, minY, maxY
     """
   
     if fig_title is not None:
@@ -680,10 +690,38 @@ def plotTablesLines(tables = None, fig_title =
     tmp.fig.data = []
 
     # Set the plotting parameters
-    tmp.setStep(step=5, stepPixels=50)
-    tmp.setY(minY=0,  maxY= 50)
-    tmp.setX(minX=0, maxX= 50)
-    tmp.setwidths(linewidth=2, pointwidth=3)
+    if tables is not None:
+      if minX is None:
+        minX = +float('inf')
+        minY = +float('inf')
+        maxX = -float('inf')
+        maxY = -float('inf')
+        
+        for tbl_idx, tbl in enumerate(tables):
+          x = tbl.data_values[0]
+          y = tbl.data_values[1]
+          minX = min(minX, min(x))
+          minY = min(minY, min(y))
+          maxX = max(maxX, max(x))
+          maxY = max(maxY, max(y))
+
+        # Adjust the x and y for a small margin.
+        NewminY = int(minY)
+        NewminX = int(minX)
+        NewmaxX = int(maxX + (maxX - minX)/10)
+        NewmaxY = int(maxY + (maxY - minY)/10)
+        minX = NewminX
+        minY = NewminY
+        maxX = NewmaxX
+        maxY = NewmaxY
+
+    # Set the axes
+    print(step, stepPixels)
+    tmp.setStep(step=step, stepPixels=stepPixels)
+    tmp.setY(minY=minY,  maxY=maxY)
+    tmp.setX(minX=minX, maxX=maxX)
+
+    tmp.setwidths(linewidth=1, pointwidth=5)
     tmp.setupGrid()
     
     
@@ -699,10 +737,17 @@ def plotTablesLines(tables = None, fig_title =
           tbl_name = []
         
         # Adding plots onto existing figure
+        point_size = 10
+        line_width = 3
         tmp.fig.add_trace( go.Scatter(x = tbl.data_values[0], 
                                           y = tbl.data_values[1], 
-                                          mode='lines+markers', 
-                                          name = tbl_name) )
+                                          mode='lines+markers',
+                                          marker=dict(
+                                            size=point_size,     # Point size
+                                            line=dict(width=2)), # Width of the border around markers
+                                          line=dict(
+                                            width=line_width),   # Line width
+                                      name = tbl_name))
       
       # Update the figure layout with titles
       tmp.fig.update_layout(title=
@@ -729,36 +774,47 @@ def plotTablesLines(tables = None, fig_title =
     # Update the figure
     tmp.fig.show()
 
-def race(tables = None, vid_width = None, 
-         vid_height = None, vid_title = None, 
-         end_line_scale = None, end_line_color = None, 
-         disp_font_sz = None, img_names = None, 
-         img_size = None, fps = None):
+    # Verify data type and save if possible:
+    if img_name is not None:
+      if not isinstance(img_name, str):
+          raise ValueError('Equations should be a string')
+      tmp.saveImage(img_name)
+
+def race(tables = None, 
+         fps = 10, img_names = None, 
+         race_distance=100,           # measured in meters.
+         simulation_speed = 1,        # 10 means ten times faster than real time.
+         target_width = 100,          # Target width for character images
+         video_name="video.mp4",
+         duration=5, vid_title = 'Race',
+         vid_width = 800, vid_height = 600):
 
       # Video dimension check
-      if vid_width is not None:
-        if vid_width <= 0 or not isinstance(vid_width, numbers.Number):
-          raise ValueError('video width should be a postive number')
-      else:
-        # Default video width
-        vid_width = 800 
+      if vid_width <= 0 or not isinstance(vid_width, numbers.Number):
+        raise ValueError('video width should be a postive number')
 
-      if vid_height is not None:
-        if vid_height <= 0 or not isinstance(vid_height, numbers.Number):
-          raise ValueError('video height should be a postive number')
-      else:
-        # Default video height
-        vid_height = 600
-      
-      if fps is not None:
-        if fps <= 0 or not isinstance(fps, numbers.Number):
-          raise ValueError('Video fps should be a postive number')
-      else:
-        fps = 10
+      if vid_height <= 0 or not isinstance(vid_height, numbers.Number):
+        raise ValueError('video height should be a postive number')
+    
+      if fps <= 0 or not isinstance(fps, numbers.Number):
+        raise ValueError('Video fps should be a postive number')
       
       # Video to store pygame
-      out_vid = cv2.VideoWriter('out_vid.mp4',cv2.VideoWriter_fourcc(*"mp4v"), fps, (vid_width, vid_height))
-      
+      if os.path.exists(video_name):
+        # Remove the file
+        os.remove(video_name)
+        print(f"File '{video_name}' has been removed.")
+      else:
+        print(f"The file '{video_name}' will be created.")
+
+      out_vid = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'MJPG'), fps, (vid_width, vid_height))
+
+      # Check if VideoWriter was successfully initialized
+      if not out_vid.isOpened():
+        raise RuntimeError("Error: Failed to initialize video writer.")
+      else:
+        print("VideoWriter initialized successfully.")
+
       # Set pygame display with video dimensions
       vid_disp = pygame.display.set_mode((vid_width, vid_height))
       
@@ -768,48 +824,13 @@ def race(tables = None, vid_width = None,
       pygame.init()
       
       # Video title check
-      if vid_title is not None:
-        if not isinstance(vid_title, str):
-          raise ValueError('Video title should be string')
-      else:
-        # Default Name
-        vid_title = 'Race'
+      if not isinstance(vid_title, str):
+        raise ValueError('Video title should be string')
       
-      # Stop line check
-      if end_line_scale is not None:
-        if end_line_scale >=1 or end_line_scale <= 0 or not isinstance(end_line_scale, numbers.Number):
-          raise ValueError('end line scale should between 0 and 1')
-      else:
-        # Default value
-        end_line_scale = 0.3
-      
-      # Stop line color
-      if end_line_color is not None:
-        for color_value in end_line_color:
-          if not isinstance(color_value, numbers.Number):
-            raise ValueError('Colors should be numbers')
-      else:
-        # Red color
-          end_line_color = (255, 0, 0)
-      
-      # Font size check
-      if disp_font_sz is not None:
-        if not isinstance(disp_font_sz, int):
-          raise ValueError('Font size should be integer')
-      else:
-        # Default value 
-        disp_font_sz = 25
-      
-      # Image Resize dimensions
-      if img_size is not None:
-        if not isinstance(img_size[0], numbers.Number) and  not isinstance(img_size[1], numbers.Number):
-          raise ValueError('Image size should be a number')
-      
-        if img_size[0] <= 0 and img_size[1] <= 0:
-          raise ValueError('Image location should be postive')
-      else:
-        # Default size
-        img_size = (100, 100)
+      # Setup some default scales:
+      end_line_scale = 0.3         # Between 0 and 1.
+      end_line_color = (255, 0, 0) # red
+      disp_font_sz = 25            # font size
         
       if img_names is not None:
         if len(img_names) != len(tables):
@@ -843,23 +864,50 @@ def race(tables = None, vid_width = None,
       py_imgs = []
       py_rects = []
       py_rect_speed = []
-      
+      orig_speeds = []
+      coords = []
+
       for tbl in tables:
-        
+        # load the given character image:
         py_img = pygame.image.load(tbl.img_path)
+
+        # Get the size of the image
+        image_size = py_img.get_size()
+        width  = image_size[0]
+        height = image_size[1]
+
+        # Transform the width to 100 pixels
+        # height/new = width/target_width
+        height_size = target_width * (height/width)
+        img_size   = (target_width, height_size)
         py_img = pygame.transform.scale(py_img, img_size)
         
         py_rect = pygame.Rect(tbl.img_loc[0], tbl.img_loc[1], 
                               py_img.get_width(), py_img.get_height())
-      
+         
         py_imgs.append(py_img)
         py_rects.append(py_rect)
         py_rect_speed.append(tbl.img_speed)
+        orig_speeds.append(tbl.img_speed)
+        coords.append([tbl.img_loc[0], tbl.img_loc[1]])
 
-      # clock counter
-      race_clock = 0
-      break_time = 0
-      
+      # Calculate pixel motions:
+      time_between_frames = 1/fps*simulation_speed 
+      num_of_frames  = duration*fps/simulation_speed
+
+      pixel_distance = race_distance / (end_line - target_width)
+      # print("number_of_frames=", num_of_frames)
+
+      # Rescale py_rect_speed:
+      # x m/s -> y pixels/frame
+      # y * fps * pixel_distance  is distance in one second
+      # x / (fps * pixel_distance)  
+      py_rect_speed = [(1/fps)* float(x) *simulation_speed / pixel_distance for x in py_rect_speed]
+     
+      # Continue until all speeds go to zero.
+      current_duration = 0.0 
+      race_clock = 0.0 
+      frame_num = 0.0
       while True:
         # Uncomment to run locally
         # for event in pygame.event.get():
@@ -869,24 +917,23 @@ def race(tables = None, vid_width = None,
         
         # Fill display with white color
         vid_disp.fill((255, 255, 255))
-                
-        race_clock += 1
-        
-        # Slow down loop by increase number 
-        timer(0.25)
-        
-        # Update pygame display for each table 
+
+        # Update pygame display for each table
+        stop = [False, False, False]
         for py_idx, py_rect in enumerate(py_rects):
           
           # Nulify image speed once reaching stop line
           if py_rect.right >= end_line:
-            tables[py_idx].img_speed = 0
-            py_rect_speed[py_idx] = 0
+            stop[py_idx] = True 
           
           vid_disp.blit(py_imgs[py_idx], py_rect)
-          
-          # Update rectangle at image speed
-          py_rect.move_ip([tables[py_idx].img_speed, 0])
+
+          if (not stop[py_idx]): 
+            x, y = coords[py_idx]
+            dx = py_rect_speed[py_idx]*frame_num
+            
+            py_img  = py_imgs[py_idx]
+            py_rects[py_idx] = pygame.Rect(round(x+dx), int(y), py_img.get_width(), py_img.get_height())
           
           # Overlay image name on video display
           img_name = vid_disp_font.render(f"{img_names[py_idx]}", True, (0, 0, 0))
@@ -895,20 +942,31 @@ def race(tables = None, vid_width = None,
           vid_disp.blit(img_name, img_name_rect)
           
           # Overlay image distance on video display
-          dist = vid_disp_font.render(f"Distance: {py_rect.x} m", True, (0, 0, 0))
+          distance = (py_rect.right - target_width)*pixel_distance
+          dist = vid_disp_font.render(f"Distance: {distance:.2f} m", True, (0, 0, 0))
           dist_rect = dist.get_rect()
           dist_rect.topleft = (end_line + 50, py_rect.y + 20)
           vid_disp.blit(dist, dist_rect)
           
+          # Overlay image distance on video display
+          the_time = distance/orig_speeds[py_idx]
+          dist = vid_disp_font.render(f"Time: {the_time:.2f} seconds", True, (0, 0, 0))
+          dist_rect = dist.get_rect()
+          dist_rect.topleft = (end_line + 50, py_rect.y + 40)
+          vid_disp.blit(dist, dist_rect)
+
           # Overlay image speed on video display 
-          spd = vid_disp_font.render(f"Speed:     {py_rect_speed[py_idx]} m/sec", True, (0, 0, 0))
+          spd = vid_disp_font.render(f"Speed:     {orig_speeds[py_idx]} m/sec", True, (0, 0, 0))
           spd_rect = spd.get_rect()
-          spd_rect.topleft = (end_line + 50, py_rect.y + 40)
+          spd_rect.topleft = (end_line + 50, py_rect.y + 60)
           vid_disp.blit(spd, spd_rect)
+
+          # Update rectangle at image speed
+          # py_rect.move_ip([py_rect_speed[py_idx], 0])
           
           
         # Overlay clock time on video display
-        race_timer = vid_disp_font.render(f"Time:       {race_clock} sec", True, (0, 0, 0))
+        race_timer = vid_disp_font.render(f"Time:       {race_clock:.2f} sec", True, (0, 0, 0))
         race_timer_rect = race_timer.get_rect()
         race_timer_rect.topleft = (end_line + 50, py_rects[-1].y + 100)
         vid_disp.blit(race_timer, race_timer_rect)
@@ -919,9 +977,10 @@ def race(tables = None, vid_width = None,
         vid_title_rect.topleft = (end_line + 50, 10)
         vid_disp.blit(vid_title_, vid_title_rect)
         
-        # Draw stop line and bottom line
+        # Draw start line, stop line and bottom line
+        pygame.draw.line(vid_disp, end_line_color, (target_width, 0), (target_width, vid_height)) # start line
         pygame.draw.line(vid_disp, end_line_color, end_line_start, end_line_end, 1)  
-        pygame.draw.line(vid_disp, black, (0, axis_line), (end_line, axis_line), 1)
+        pygame.draw.line(vid_disp, black, (0, axis_line), (end_line, axis_line), 1)  
         
         # Update entire pygame display
         pygame.display.flip()
@@ -931,52 +990,124 @@ def race(tables = None, vid_width = None,
         cv2_img = cv2_img.transpose([1, 0, 2])
         cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_RGB2BGR)
         out_vid.write(cv2_img)
+
+        current_duration = frame_num / fps  
+        race_clock = current_duration  * simulation_speed
+        frame_num += 1.0
         
         # Wait and break after reaching stop line        
-        if sum(py_rect_speed) == 0:
-          break_time +=1
-          if break_time >= 3:
-            out_vid.release()
-            break
-      
+        if all(stop):
+          # Fill up with the same frame.
+          frames_left = int((duration - current_duration)*fps)
+          if (frames_left > 0):
+            for i in range(frames_left):
+              out_vid.write(cv2_img)
 
-      # return "out_vid.mp4"
-        
+          out_vid.release()
+          pygame.quit()
+          print("video file = ", video_name," closed.")
+          break 
+      
+      race_video = moviepy.editor.VideoFileClip(video_name)
+      return(race_video)
 
 from skimage import io
 
-def CreateVideo(video_name, file_list, fps):
+def CreateVideo(video_name, file_list, fps, durations):
   #self.plot_to_frame()
   height_list  = []
   width_list   = []
-  video_frames = []
 
   # Find the biggest sizes
-  for frame in file_list:
-    img = io.imread(frame)
-    video_frames.append(img)
-    height, width, channels = img.shape
-    height_list.append(height)
-    width_list.append(width)
+  for filename in file_list:
+    # Check if we are working with a video file:
+    if (filename.lower().endswith('.mp4')):
+      # Open the file:
+      cap = cv2.VideoCapture(filename)
+      
+      # Check if video opened successfully
+      if not cap.isOpened():
+        print("Error: Could not open video: file name = ", filename)
+        return None
+      
+      # Get video properties
+      width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+      height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+      frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+      # Append them:
+      height_list.append(height)
+      width_list.append(width)
+
+      cap.release()
+    else:
+      img = io.imread(filename)
+      height, width, channels = img.shape
+      height_list.append(height)
+      width_list.append(width)
 
   #print(height_list)
   h_video=np.max(height_list)
   w_video=np.max(width_list)
+
+  # Remove the file if it is already here:
+  if os.path.exists(video_name):
+    # Remove the file
+    os.remove(video_name)
+    print(f"File '{video_name}' has been removed.")
+  else:
+    print(f"The file '{video_name}' will be created.")
 
   #fourcc = cv2.VideoWriter_fourcc('X', 'V', 'I', 'D')
   video = cv2.VideoWriter(video_name,
             cv2.VideoWriter_fourcc(*'MJPG'),
             fps,
             (w_video, h_video))
+  
+  # Check if VideoWriter was successfully initialized
+  if not video.isOpened():
+    raise RuntimeError("Error: Failed to initialize video writer.")
+  else:
+    print("VideoWriter initialized successfully.")
 
-  for frame in video_frames:
-    video = padding(frame, video, h_video, w_video)
+  # Save all of the frames after padding
+  for filename, duration in zip(file_list, durations):
+    # Check if we are working with a video file:
+    if (filename.lower().endswith('.mp4')):
+      # Open the file:
+      cap = cv2.VideoCapture(filename)
+      
+      # Check if video opened successfully
+      if not cap.isOpened():
+        print("Error: Could not open video: file name = ", filename)
+        return None
+      
+      # Read all the frames:
+      while True:
+        # Read frame
+        ret, frame = cap.read()
 
+        # If frame is read correctly ret is True
+        if not ret:
+            break
+        
+        # pad the frame and write to the file:
+        video = padding(frame, video, h_video, w_video)
+
+      # When everything done, release the video capture object
+      cap.release()
+    else:
+      # pad the frame and write to the file:
+      frame = io.imread(filename)
+      num_of_frames = int(duration*fps) 
+      for i in range(num_of_frames):
+        video = padding(frame, video, h_video, w_video)
+
+  # Close the video
   video.release()
-
-  vid = MakeVideo(video_name, width=w_video, height=h_video)
-  return vid.HTML_str
-
+  final_video = moviepy.editor.VideoFileClip(video_name)
+  return(final_video)
+  
 def padding(frame, video, h_video, w_video):
   old_h, old_w, channels = frame.shape
   if divmod(h_video - old_h, 2)[1] != 0:
@@ -1004,13 +1135,10 @@ def padding(frame, video, h_video, w_video):
 
   new_h, new_w, channels = padding_image.shape
 
-  #plt.imshow(padding_image)
-  #plt.show()
-  padding_image = cv2.cvtColor(padding_image, cv2.COLOR_BGR2RGB)
   video.write(padding_image)
   return video
 
-
+# Original method for displaying video in Jupyter Notebook.
 class MakeVideo:
   def __init__(self, mp4_fname, width, height):
     """ compresses the video file and displays in Jupyter notebook.
@@ -1049,3 +1177,37 @@ class MakeVideo:
                  <video width="%s" height="%s" controls loop autoplay>
                     <source src="%s" type="video/mp4">
                  </video> """ % (self.width, self.height, data_url)
+
+# Function to change video speed.
+# Example usage: Double the speed
+# change_playback_speed("all.mp4", "all2.mp4", 0.5)
+def changeVideoSpeed(input_path, output_path, speed_factor):
+    video = VideoFileClip(input_path)
+    # Speed up or slow down the video
+    new_video = video.fx(vfx.speedx, speed_factor)
+    new_video.write_videofile(output_path)
+
+
+# Create and save an image with text.
+def textImage(output_path, multiline_string, image_size=(500, 300), font_scale=1, font_color=(0, 0, 0), line_space=0):
+    # Create a blank white image
+    image = np.ones((image_size[1], image_size[0], 3), dtype=np.uint8) * 255
+
+    # Splitting the multiline string into a list of lines
+    lines = multiline_string.splitlines()
+
+
+    # Set font type
+    font = cv2.FONT_HERSHEY_SIMPLEX 
+    font_thickness = 2
+
+    # Starting Y position
+    y = 30  # Start a bit lower if you want to keep a margin
+
+    # Add each line of text to the image
+    for line in lines:
+        cv2.putText(image, line, (10, y), font, font_scale, font_color, font_thickness, cv2.LINE_AA)
+        y += int(font_scale * 40) + line_space  # Adjust spacing between lines based on font size
+
+    # Save the result
+    cv2.imwrite(output_path, image)
