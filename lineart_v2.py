@@ -787,6 +787,8 @@ def race(tables = None,
          target_width = 100,          # Target width for character images
          video_name="video.mp4",
          duration=5, vid_title = 'Race',
+         distance_string = "m", time_string = "seconds",
+         speed_string = "m/s",
          vid_width = 800, vid_height = 600):
 
       # Video dimension check
@@ -943,20 +945,20 @@ def race(tables = None,
           
           # Overlay image distance on video display
           distance = (py_rect.right - target_width)*pixel_distance
-          dist = vid_disp_font.render(f"Distance: {distance:.2f} m", True, (0, 0, 0))
+          dist = vid_disp_font.render(f"Distance: {distance:.2f} {distance_string}", True, (0, 0, 0))
           dist_rect = dist.get_rect()
           dist_rect.topleft = (end_line + 50, py_rect.y + 20)
           vid_disp.blit(dist, dist_rect)
           
           # Overlay image distance on video display
           the_time = distance/orig_speeds[py_idx]
-          dist = vid_disp_font.render(f"Time: {the_time:.2f} seconds", True, (0, 0, 0))
+          dist = vid_disp_font.render(f"Time: {the_time:.2f} {time_string}", True, (0, 0, 0))
           dist_rect = dist.get_rect()
           dist_rect.topleft = (end_line + 50, py_rect.y + 40)
           vid_disp.blit(dist, dist_rect)
 
           # Overlay image speed on video display 
-          spd = vid_disp_font.render(f"Speed:     {orig_speeds[py_idx]} m/sec", True, (0, 0, 0))
+          spd = vid_disp_font.render(f"Speed: {orig_speeds[py_idx]} {speed_string}", True, (0, 0, 0))
           spd_rect = spd.get_rect()
           spd_rect.topleft = (end_line + 50, py_rect.y + 60)
           vid_disp.blit(spd, spd_rect)
@@ -966,7 +968,7 @@ def race(tables = None,
           
           
         # Overlay clock time on video display
-        race_timer = vid_disp_font.render(f"Time:       {race_clock:.2f} sec", True, (0, 0, 0))
+        race_timer = vid_disp_font.render(f"Time: {race_clock:.2f} {time_string}", True, (0, 0, 0))
         race_timer_rect = race_timer.get_rect()
         race_timer_rect.topleft = (end_line + 50, py_rects[-1].y + 100)
         vid_disp.blit(race_timer, race_timer_rect)
@@ -1099,13 +1101,20 @@ def CreateVideo(video_name, file_list, fps, durations):
       cap.release()
     else:
       # pad the frame and write to the file:
-      read_frame = io.imread(filename)
-      if read_frame is None:
+      image = io.imread(filename)
+      if image is None:
         print("I cannot open filename = ", filename)
         break
 
-      frame = read_frame[:, :, :3] 
-      # print("Writing frame shape = ", frame.shape)
+      if image.shape[2] == 4:
+        # Split the channels
+        b, g, r, a = cv2.split(image)
+        
+        # Merge the BGR channels back
+        frame = cv2.merge([b, g, r])
+      else:
+        frame = image
+
       num_of_frames = int(duration*fps) 
       for i in range(num_of_frames):
         video = padding(frame, video, h_video, w_video)
@@ -1141,7 +1150,6 @@ def padding(frame, video, h_video, w_video):
     value = [255, 255, 255])
 
   new_h, new_w, channels = padding_image.shape
-
   video.write(padding_image)
   return video
 
