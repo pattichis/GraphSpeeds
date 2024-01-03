@@ -1049,6 +1049,7 @@ def CreateVideo(video_name, file_list, fps, durations):
   #print(height_list)
   h_video=np.max(height_list)
   w_video=np.max(width_list)
+  print("video: height = ", h_video, " width = ", w_video)
 
   # Remove the file if it is already here:
   if os.path.exists(video_name):
@@ -1099,6 +1100,9 @@ def CreateVideo(video_name, file_list, fps, durations):
     else:
       # pad the frame and write to the file:
       frame = io.imread(filename)
+      if frame is None:
+        print("I cannot open filename = ", filename)
+        break 
       num_of_frames = int(duration*fps) 
       for i in range(num_of_frames):
         video = padding(frame, video, h_video, w_video)
