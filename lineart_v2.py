@@ -1099,10 +1099,13 @@ def CreateVideo(video_name, file_list, fps, durations):
       cap.release()
     else:
       # pad the frame and write to the file:
-      frame = io.imread(filename)
-      if frame is None:
+      read_frame = io.imread(filename)
+      if read_frame is None:
         print("I cannot open filename = ", filename)
-        break 
+        break
+
+      frame = read_frame[:, :, :3] 
+      # print("Writing frame shape = ", frame.shape)
       num_of_frames = int(duration*fps) 
       for i in range(num_of_frames):
         video = padding(frame, video, h_video, w_video)
