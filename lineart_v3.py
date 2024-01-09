@@ -129,8 +129,6 @@ def plotTablesLines(tables = None,
                     fig_title = None, x_label = None, y_label = None, 
                     legend_title = None, legend_labels = None,
                     equation_labels = None,
-                    minX = None, minY = None, maxX = None, maxY = None, 
-                    stepX = 5, stepY=5, stepPixels = 50,
                     img_name = None):
     """ plots a table as plot from given columns
         Optional:
@@ -229,99 +227,72 @@ def plotTablesLines(tables = None,
       cv2.imwrite(img_name, bgr_img) 
       # tmp.saveImage(img_name)
 
-def race(tables = None, 
-         fps = 10, img_names = None, 
-         race_distance=100,           # measured in meters.
-         simulation_speed = 1,        # 10 means ten times faster than real time.
-         target_width = 100,          # Target width for character images
-         video_name="video.mp4",
-         duration=5, vid_title = 'Race',
-         distance_string = "m", time_string = "seconds",
-         speed_string = "m/s",
-         vid_width = 800, vid_height = 600,
-         max_frames = 500):
+class simulationVideo:
+  """
+  The race class is used for preparing a race video simulation.
+  The users can specify characters for the race. 
+  Each character has its own race lane and image.
 
-      # Video dimension check
-      if vid_width <= 0 or not isinstance(vid_width, numbers.Number):
-        raise ValueError('video width should be a postive number')
+  Refer to GraphSpeeds_lesson3.ipynb for usage.
 
-      if vid_height <= 0 or not isinstance(vid_height, numbers.Number):
-        raise ValueError('video height should be a postive number')
-    
-      if fps <= 0 or not isinstance(fps, numbers.Number):
-        raise ValueError('Video fps should be a postive number')
-      
-      # Video to store pygame
-      if os.path.exists(video_name):
-        # Remove the file
-        os.remove(video_name)
-        print(f"File '{video_name}' has been removed.")
-      else:
-        print(f"The file '{video_name}' will be created.")
+  Game characters (required)
+  --------------------------
+  tables: This is a list of tables. Each character is a table. 
+  Each table contains:
+      table_name.name:  character name.
+      table_name.img:   image filename that represents the character.
+      table_name.loc:   Pixel coordinates for the setup (e.g., (0, 50))
+      table_name.speed: the physical speed
 
-      out_vid = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'MJPG'), fps, (vid_width, vid_height))
+  target_width:  the number of pixels for each character. Default=100 pixels.
 
-      # Check if VideoWriter was successfully initialized
-      if not out_vid.isOpened():
-        raise RuntimeError("Error: Failed to initialize video writer.")
-      else:
-        print("VideoWriter initialized successfully.")
 
-      # Set pygame display with video dimensions
-      vid_disp = pygame.display.set_mode((vid_width, vid_height))
-      
-      # pygame.display.set_caption('Race to Bumpers') # Enable this to run locally
-      
-      # Initialize pygame 
-      pygame.init()
-      
-      # Video title check
-      if not isinstance(vid_title, str):
-        raise ValueError('Video title should be string')
-      
-      # Setup some default scales:
-      end_line_scale = 0.3         # Between 0 and 1.
-      end_line_color = (255, 0, 0) # red
-      disp_font_sz = 25            # font size
-        
-      if img_names is not None:
-        if len(img_names) != len(tables):
-          raise ValueError('Numbers of labels must be equal to number of tables')
-        
-        for img_name in img_names:
-          if not isinstance(img_name, str):
-            raise ValueError('Image names should be strings')
-      else:
-        img_names = []
-      
-      
-      # Stop line 
-      end_line = vid_width - end_line_scale*vid_width
-      end_line_start = (end_line, 0)
-      end_line_end = (end_line, vid_height)
-      
-      # Axis units
-      axis_unit = 10
-      axis_line = vid_height - 0.1*vid_height
-      dist_axis = (0, axis_line)
-      axis_font_sz = 15
-      
-      # Black color
-      black = (0, 0, 0)
-      
-      # Video character font size
-      vid_disp_font = pygame.font.Font(None, disp_font_sz)
-      
-      # Extract table objects attributes
-      py_imgs = []
-      py_rects = []
-      py_rect_speed = []
-      orig_speeds = []
-      coords = []
+  Simulation parameters (required)
+  --------------------------------
+  duration:         This is the amount of time to simulate.
+  race_distance:    This is the physical distance being simulated.
+                    It can be in meters, feet, or any unit of distance.
+  vid_title:        The name for the video. Default="Race".
+   
+  
+  Units (optional)
+  ----------------
+  distance_string: string describing distance (e.g., "m", "miles")
+  time_string:     string describing time (e.g., "hours", "seconds")
+  speed_string:    speed string (e.g., "miles/hour")
 
-      for tbl in tables:
+  Video parameters (optional)
+  ---------------------------
+  video_name: the file to prepare.
+  fps:        frames per second.
+  vid_width:  The number of columns in the video.
+  vid_height: The number of rows in the video.
+  max_frames: The maximum number of frames allowed for the video.
+  target_width:     the target width for the downloaded character images.
+  simulation_speed: simulation_speed*duration represents the number
+                    of seconds used for creating the video.
+                    Default=1.0.
+  """
+
+  def __init__(self, tables, duration, race_distance, vid_title):
+    """ Setup the simulation basic parameters.
+    """
+    self.tables   = tables
+    self.duration = duration 
+    self.race_distance = race_distance
+    self.vid_title     = vid_title 
+
+    # Call functions to set default values:
+    self.set_units()
+    self.set_video()
+
+
+  def resize_characters(self, py_imgs, py_rects, py_rect_speed, orig_speeds, coords, img_names):
+    """ helper function for resizing character images and storing them locally. """
+
+    for tbl in self.tables:
         # load the given character image:
-        py_img = pygame.image.load(tbl.img_path)
+        py_img = pygame.image.load(tbl.img)
 
         # Get the size of the image
         image_size = py_img.get_size()
@@ -330,158 +301,291 @@ def race(tables = None,
 
         # Transform the width to 100 pixels
         # height/new = width/target_width
-        height_size = target_width * (height/width)
-        img_size   = (target_width, height_size)
+        img_name = tbl.name 
+        height_size = self.target_width * (height/width)
+        img_size   = (self.target_width, height_size)
         py_img = pygame.transform.scale(py_img, img_size)
         
-        py_rect = pygame.Rect(tbl.img_loc[0], tbl.img_loc[1], 
+        py_rect = pygame.Rect(tbl.loc[0], tbl.loc[1], 
                               py_img.get_width(), py_img.get_height())
          
         py_imgs.append(py_img)
         py_rects.append(py_rect)
-        py_rect_speed.append(tbl.img_speed)
-        orig_speeds.append(tbl.img_speed)
-        coords.append([tbl.img_loc[0], tbl.img_loc[1]])
+        py_rect_speed.append(tbl.speed)
+        orig_speeds.append(tbl.speed)
+        coords.append([tbl.loc[0], tbl.loc[1]])
+        img_names.append(img_name)
+  
+  
 
-      # Calculate pixel motions:
-      time_between_frames = 1/fps*simulation_speed 
-      num_of_frames  = duration*fps/simulation_speed
+  def set_units(self, distance_string="miles", time_string="hours", speed_string="miles/hour"):
+    """ Setup the units for the simulation. Default is miles/hour.
+    """
+    self.distance_string = distance_string
+    self.time_string     = time_string
+    self.speed_string    = speed_string
 
-      pixel_distance = race_distance / (end_line - target_width)
-      # print("number_of_frames=", num_of_frames)
 
-      if (num_of_frames > max_frames):
+  def set_video(self, video_name="race.mp4", fps=10, vid_width=800, vid_height=600, 
+                max_frames=500, target_width=100, simulation_speed=1.0):
+    """ Setup the video simulation parameters. Default values are provided.
+    """
+    # Video dimension check
+    if vid_width <= 0 or not isinstance(vid_width, numbers.Number):
+      raise ValueError('video width should be a postive number')
+
+    if vid_height <= 0 or not isinstance(vid_height, numbers.Number):
+      raise ValueError('video height should be a postive number')
+    
+    if fps <= 0 or not isinstance(fps, numbers.Number):
+      raise ValueError('Video fps should be a postive number')
+    
+    # pygame.display.set_caption('Race to Bumpers') # Enable this to run locally    
+    # Initialize pygame 
+    pygame.init()
+    
+    # Setup the video  
+    self.video_name = video_name
+    self.fps = fps
+    self.vid_width  = vid_width
+    self.vid_height = vid_height
+    self.max_frames = max_frames
+
+    self.target_width  = target_width
+    self.simulation_speed = simulation_speed
+    
+    # Setup some default scales:
+    self.end_line_scale = 0.3         # Between 0 and 1.
+    self.end_line_color = (255, 0, 0) # red
+    self.disp_font_sz = 25            # font size
+
+    # Stop line 
+    self.end_line = self.vid_width - self.end_line_scale * self.vid_width
+    self.end_line_start = (self.end_line, 0)
+    self.end_line_end = (self.end_line, self.vid_height)
+    
+    # Axis units
+    self.axis_unit = 10
+    self.axis_line = self.vid_height - 0.1*self.vid_height
+    self.dist_axis = (0, self.axis_line)
+    self.axis_font_sz = 15
+
+    # Black color
+    self.black = (0, 0, 0)
+
+    # Video character font size
+    self.vid_disp_font = pygame.font.Font(None, self.disp_font_sz)
+    
+    # Extract table objects attributes
+    self.py_imgs   = []
+    self.py_rects  = []
+    self.py_rect_speed = []
+    self.orig_speeds = []
+    self.coords    = []
+    self.img_names = []
+    self.resize_characters(self.py_imgs, self.py_rects, self.py_rect_speed, 
+                           self.orig_speeds, self.coords, self.img_names)
+          
+    # Calculate pixel motions:
+    self.time_between_frames = 1/fps*self.simulation_speed 
+    self.num_of_frames  = self.duration*fps/self.simulation_speed
+
+    self.pixel_distance = self.race_distance / (self.end_line - self.target_width)
+    # print("number_of_frames=", num_of_frames)
+
+    # Rescale py_rect_speed:
+    # x m/s -> y pixels/frame
+    # y * fps * pixel_distance  is distance in one second
+    # x / (fps * pixel_distance)  
+    self.py_rect_speed = [(1/self.fps)* float(x)*self.simulation_speed / self.pixel_distance 
+                          for x in self.py_rect_speed]
+
+
+    if (self.num_of_frames > self.max_frames):
         print("Too many frames!")
-        print("num_of_frames = ", num_of_frames)
+        print("num_of_frames = ", self.num_of_frames)
         print("Reduce duration and run again.")
-        print("duration = ", duration)
+        print("duration = ", self.duration)
         return 
 
-      # Rescale py_rect_speed:
-      # x m/s -> y pixels/frame
-      # y * fps * pixel_distance  is distance in one second
-      # x / (fps * pixel_distance)  
-      py_rect_speed = [(1/fps)* float(x) *simulation_speed / pixel_distance for x in py_rect_speed]
-     
-      # Continue until all speeds go to zero.
-      current_duration = 0.0 
-      race_clock = 0.0 
-      frame_num = 0.0
-      while True:
-        # Uncomment to run locally
-        # for event in pygame.event.get():
-        #   if event.type == pygame.QUIT:
-        #     pygame.quit()
-        #     sys.exit()
-        
-        # Fill display with white color
-        vid_disp.fill((255, 255, 255))
+    
+  def __repr__(self) -> str:
+    str_rep = "race_video class parameters.\n"
+    str_rep += "vid_title = "+str(self.vid_title)+"\n"
+    str_rep += "Tables:"
+    str_rep += str(self.tables)
+    str_rep += "Initialization parameters\n"
+    str_rep += "target_width  = "+str(self.target_width)+"\n"
+    str_rep += "duration      = "+str(self.duration)+"\n" 
+    str_rep += "race_distance = "+str(self.race_distance)+"\n"
+    str_rep += "simulation_speed = "+str(self.simulation_speed)+"\n\n"
 
-        # Update pygame display for each table
-        stop = [False, False, False]
-        stop = np.full(len(py_rects), False) 
-        for py_idx, py_rect in enumerate(py_rects):
-          
-          # Nulify image speed once reaching stop line
-          if py_rect.right >= end_line:
-            stop[py_idx] = True 
-          
-          vid_disp.blit(py_imgs[py_idx], py_rect)
+    str_rep += "Units\n"
+    str_rep += "distance_string = "+str(self.distance_string)+"\n"
+    str_rep += "time_string     = "+str(self.time_string)+"\n"
+    str_rep += "speed_string    = "+str(self.speed_string)+"\n"
 
-          if (not stop[py_idx]): 
-            x, y = coords[py_idx]
-            dx = py_rect_speed[py_idx]*frame_num
-            
-            py_img  = py_imgs[py_idx]
-            py_rects[py_idx] = pygame.Rect(round(x+dx), int(y), py_img.get_width(), py_img.get_height())
-          
-          # Overlay image name on video display
-          img_name = vid_disp_font.render(f"{img_names[py_idx]}", True, (0, 0, 0))
-          img_name_rect = img_name.get_rect()
-          img_name_rect.topleft = (end_line + 50, py_rect.y)
-          vid_disp.blit(img_name, img_name_rect)
-          
-          # Overlay image distance on video display
-          distance = (py_rect.right - target_width)*pixel_distance
-          dist = vid_disp_font.render(f"Distance: {distance:.2f} {distance_string}", True, (0, 0, 0))
-          dist_rect = dist.get_rect()
-          dist_rect.topleft = (end_line + 50, py_rect.y + 20)
-          vid_disp.blit(dist, dist_rect)
-          
-          # Overlay image distance on video display
-          the_time = distance/orig_speeds[py_idx]
-          dist = vid_disp_font.render(f"Time: {the_time:.2f} {time_string}", True, (0, 0, 0))
-          dist_rect = dist.get_rect()
-          dist_rect.topleft = (end_line + 50, py_rect.y + 40)
-          vid_disp.blit(dist, dist_rect)
-
-          # Overlay image speed on video display 
-          spd = vid_disp_font.render(f"Speed: {orig_speeds[py_idx]} {speed_string}", True, (0, 0, 0))
-          spd_rect = spd.get_rect()
-          spd_rect.topleft = (end_line + 50, py_rect.y + 60)
-          vid_disp.blit(spd, spd_rect)
-
-          # Update rectangle at image speed
-          # py_rect.move_ip([py_rect_speed[py_idx], 0])
-          
-          
-        # Overlay clock time on video display
-        race_timer = vid_disp_font.render(f"Time: {race_clock:.2f} {time_string}", True, (0, 0, 0))
-        race_timer_rect = race_timer.get_rect()
-        race_timer_rect.topleft = (end_line + 50, py_rects[-1].y + 100)
-        vid_disp.blit(race_timer, race_timer_rect)
-        
-        # Overlay video title
-        vid_title_ = vid_disp_font.render(f"{vid_title}", True, (0, 0, 0))
-        vid_title_rect = vid_title_.get_rect()
-        vid_title_rect.topleft = (end_line + 50, 10)
-        vid_disp.blit(vid_title_, vid_title_rect)
-        
-        # Draw start line, stop line and bottom line
-        pygame.draw.line(vid_disp, end_line_color, (target_width, 0), (target_width, vid_height)) # start line
-        pygame.draw.line(vid_disp, end_line_color, end_line_start, end_line_end, 1)  
-        pygame.draw.line(vid_disp, black, (0, axis_line), (end_line, axis_line), 1)  
-        
-        # Update entire pygame display
-        pygame.display.flip()
-
-        # Save pygame display as video 
-        cv2_img = pygame.surfarray.array3d(vid_disp)
-        cv2_img = cv2_img.transpose([1, 0, 2])
-        cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_RGB2BGR)
-        out_vid.write(cv2_img)
-
-        current_duration = frame_num / fps  
-        race_clock = current_duration  * simulation_speed
-        frame_num += 1.0
-
-        # Terminate based on duration or all reached the end.
-        stop_cond = current_duration > duration 
-        stop_cond = stop_cond or all(stop) 
-
-        if (frame_num > max_frames):
-          print("Too many frames!")
-          print("frame_num = ", frame_num)
-          stop_cond = True 
-        
-        
-        # Wait and break after reaching stop line        
-        if stop_cond:
-          # Fill up with the same frame.
-          frames_left = int((duration - current_duration)*fps)
-          if (frames_left > 0):
-            for i in range(frames_left):
-              out_vid.write(cv2_img)
-
-          out_vid.release()
-          pygame.quit()
-          print("video file = ", video_name," closed.")
-          break 
+    str_rep += "Video\n"
+    str_rep += "video_name = "+str(self.video_name)+"\n"
+    str_rep += "vid_width  = "+str(self.vid_width)+"\n"
+    str_rep += "vid_height = "+str(self.vid_height)+"\n"
+    str_rep += "max_frames = "+str(str.max_frames)+"\n"  
+    return(str_rep)
+  
+  
+  def open_video(self):
+    """ Helper function to open up video file. """
+    
+    # Video to store pygame
+    if os.path.exists(self.video_name):
+      # Remove the file
+      os.remove(self.video_name)
+      print(f"File '{self.video_name}' has been removed.")
+    else:
+      print(f"The file '{self.video_name}' will be created.")
       
-      race_video = moviepy.editor.VideoFileClip(video_name)
-      return(race_video)
+    # Open up the video file:
+    self.out_vid = cv2.VideoWriter(self.video_name, 
+                    cv2.VideoWriter_fourcc(*'MJPG'), 
+                    self.fps, (self.vid_width, self.vid_height))
+    
+    # Check if VideoWriter was successfully initialized
+    if not self.out_vid.isOpened():
+      raise RuntimeError("Error: Failed to initialize video writer.")
+    else:
+      print("VideoWriter initialized successfully.")
+      
+      
+  def create_video(self):
+    """ Creates the video simulation stores it in a video file. """
+    self.open_video()
+    
+    # Set pygame display with video dimensions
+    vid_disp = pygame.display.set_mode((self.vid_width, self.vid_height))
+    
+    # Simulation loop:
+    current_duration = 0.0 
+    race_clock = 0.0 
+    frame_num = 0.0
 
-from skimage import io
+    # Set the offset off the end line:
+    offset = 20
+        
+    while True:
+      # Fill display with white color
+      vid_disp.fill((255, 255, 255))
+      
+      # Update pygame display for each table
+      stop = np.full(len(self.py_rects), False) 
+      for py_idx, py_rect in enumerate(self.py_rects):
+        # Nulify image speed once reaching stop line
+        if py_rect.right >= self.end_line:
+          stop[py_idx] = True 
+        
+        # Place the character image
+        vid_disp.blit(self.py_imgs[py_idx], py_rect)
+        
+        # Move the character
+        if (not stop[py_idx]): 
+          x, y = self.coords[py_idx]
+          dx   = self.py_rect_speed[py_idx]*frame_num
+          
+          py_img  = self.py_imgs[py_idx]
+          self.py_rects[py_idx] = pygame.Rect(round(x+dx), int(y), 
+                                    py_img.get_width(), py_img.get_height())
+            
+        # Overlay image name on video display
+        img_name = self.vid_disp_font.render(f"{self.img_names[py_idx]}", True, (0, 0, 0))
+        img_name_rect = img_name.get_rect()
+        img_name_rect.topleft = (self.end_line + offset, py_rect.y)
+        vid_disp.blit(img_name, img_name_rect)
+        
+        # Overlay image distance on video display
+        distance = (py_rect.right - self.target_width)*self.pixel_distance
+        dist = self.vid_disp_font.render(f"Distance: {distance:.2f} {self.distance_string}", 
+                                         True, (0, 0, 0))
+        dist_rect = dist.get_rect()
+        dist_rect.topleft = (self.end_line + offset, py_rect.y + 20)
+        vid_disp.blit(dist, dist_rect)
+        
+        # Overlay image distance on video display
+        the_time = distance/self.orig_speeds[py_idx]
+        dist = self.vid_disp_font.render(f"Time: {the_time:.2f} {self.time_string}", True, (0, 0, 0))
+        dist_rect = dist.get_rect()
+        dist_rect.topleft = (self.end_line + offset, py_rect.y + 40)
+        vid_disp.blit(dist, dist_rect)
+        
+        # Overlay image speed on video display 
+        spd = self.vid_disp_font.render(f"Speed: {self.orig_speeds[py_idx]} {self.speed_string}", True, (0, 0, 0))
+        spd_rect = spd.get_rect()
+        spd_rect.topleft = (self.end_line + offset, py_rect.y + 60)
+        vid_disp.blit(spd, spd_rect)
+        
+        # Update rectangle at image speed
+        # py_rect.move_ip([py_rect_speed[py_idx], 0])
+        
+      # Overlay clock time on video display
+      race_timer = self.vid_disp_font.render(f"Time: {race_clock:.2f} {self.time_string}", True, (0, 0, 0))
+      race_timer_rect = race_timer.get_rect()
+      race_timer_rect.topleft = (self.end_line + offset, self.py_rects[-1].y + 100)
+      vid_disp.blit(race_timer, race_timer_rect)
+      
+      # Overlay video title
+      vid_title_ = self.vid_disp_font.render(f"{self.vid_title}", True, (0, 0, 0))
+      vid_title_rect = vid_title_.get_rect()
+      vid_title_rect.topleft = (self.end_line + offset, 10)
+      vid_disp.blit(vid_title_, vid_title_rect)
+      
+      # Draw start line, stop line and bottom line
+      pygame.draw.line(vid_disp, self.end_line_color, 
+                       (self.target_width, 0), (self.target_width, self.vid_height)) # start line
+      pygame.draw.line(vid_disp, self.end_line_color, 
+                     self.end_line_start, self.end_line_end, 1)  
+      pygame.draw.line(vid_disp, self.black, 
+                     (0, self.axis_line), 
+                     (self.end_line, self.axis_line), 1)  
+      
+      # Update entire pygame display
+      pygame.display.flip()
+      
+      # Save pygame display as video 
+      cv2_img = pygame.surfarray.array3d(vid_disp)
+      cv2_img = cv2_img.transpose([1, 0, 2])
+      cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_RGB2BGR)
+      self.out_vid.write(cv2_img)
+      
+      
+      current_duration = frame_num / self.fps  
+      race_clock = current_duration  * self.simulation_speed
+      frame_num += 1.0
+      
+      
+      # Terminate based on duration or all reached the end.
+      stop_cond = current_duration > self.duration 
+      stop_cond = stop_cond or all(stop) 
+      
+      if (frame_num > self.max_frames):
+        print("Too many frames!")
+        print("frame_num = ", frame_num)
+        stop_cond = True 
+        
+      # Wait and break after reaching stop line        
+      if stop_cond:
+        # Fill up with the same frame.
+        frames_left = int((self.duration - current_duration)*self.fps)
+        if (frames_left > 0):
+            for i in range(frames_left):
+              self.out_vid.write(cv2_img)
+              
+        self.out_vid.release()
+        pygame.quit()
+        print("video file = ", self.video_name," closed.")
+        break 
+      
+    race_video = moviepy.editor.VideoFileClip(self.video_name)
+    return(race_video)
+
+
 
 def CreateVideo(video_name, file_list, fps, durations):
   #self.plot_to_frame()
@@ -664,11 +768,12 @@ class MakeVideo:
 # Function to change video speed.
 # Example usage: Double the speed
 # change_playback_speed("all.mp4", "all2.mp4", 0.5)
-def changeVideoSpeed(input_path, output_path, speed_factor):
-    video = VideoFileClip(input_path)
+def changeVideoSpeed(input_video, output_video, speed_factor):
+    """ changeVideoSpeed() can be used to create a video at a different speed. """
+    video = VideoFileClip(input_video)
     # Speed up or slow down the video
     new_video = video.fx(vfx.speedx, speed_factor)
-    new_video.write_videofile(output_path)
+    new_video.write_videofile(output_video)
 
 
 # Create and save an image with text.
