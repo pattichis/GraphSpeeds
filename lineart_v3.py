@@ -597,6 +597,7 @@ def CreateVideo(video_name, file_list, fps, durations):
     # Check if we are working with a video file:
     if (filename.lower().endswith('.mp4')):
       # Open the file:
+      print("Opening ", filename)
       cap = cv2.VideoCapture(filename)
       
       # Check if video opened successfully
@@ -615,6 +616,7 @@ def CreateVideo(video_name, file_list, fps, durations):
 
       cap.release()
     else:
+      print("Opening ", filename)
       img = cv2.imread(filename)
       height, width, channels = img.shape
       height_list.append(height)
