@@ -603,7 +603,7 @@ def CreateVideo(video_name, file_list, fps, durations):
       # Check if video opened successfully
       if not cap.isOpened():
         print("Error: Could not open video: file name = ", filename)
-        return None
+        raise ValueError("file name = "+filename+" cannot be opened!")
       
       # Get video properties
       width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -618,6 +618,11 @@ def CreateVideo(video_name, file_list, fps, durations):
     else:
       print("Opening ", filename)
       img = cv2.imread(filename)
+
+      if img is None:
+        print("Error: Could not open image: file name = ", filename)
+        raise ValueError("file name = "+filename+" cannot be opened!")
+      
       height, width, channels = img.shape
       height_list.append(height)
       width_list.append(width)
