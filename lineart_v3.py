@@ -9,8 +9,8 @@ from PIL import Image
 import cv2
 import os
 
-from ipywidgets import interact, interactive, fixed, interact_manual, FloatSlider
-import ipywidgets as widgets
+# from ipywidgets import interact, interactive, fixed, interact_manual, FloatSlider
+# import ipywidgets as widgets
 
 import numpy as np              # import NumPy library
 
@@ -19,7 +19,7 @@ import numbers
 # Plot the function:
 import matplotlib.pyplot as plt
 
-import math # for floor and ceiling
+# import math # for floor and ceiling
 import sympy as sp
 x = sp.symbols('x')
 
@@ -30,7 +30,7 @@ import time
 # Import plotly
 # !pip install kaleido
 
-import plotly
+# import plotly
 import plotly.graph_objects as go
 import plotly.express as px
 
@@ -501,16 +501,17 @@ class simulationVideo:
         vid_disp.blit(img_name, img_name_rect)
         
         # Overlay image distance on video display
-        distance = (py_rect.right - self.target_width)*self.pixel_distance
+        # distance = (py_rect.right - self.target_width)*self.pixel_distance
+        distance = race_clock * self.orig_speeds[py_idx]
         dist = self.vid_disp_font.render(f"Distance: {distance:.2f} {self.distance_string}", 
                                          True, (0, 0, 0))
         dist_rect = dist.get_rect()
         dist_rect.topleft = (self.end_line + offset, py_rect.y + 20)
         vid_disp.blit(dist, dist_rect)
         
-        # Overlay image distance on video display
-        the_time = distance/self.orig_speeds[py_idx]
-        dist = self.vid_disp_font.render(f"Time: {the_time:.2f} {self.time_string}", True, (0, 0, 0))
+        # Overlay time on video display
+        # the_time = distance/self.orig_speeds[py_idx]
+        dist = self.vid_disp_font.render(f"Time: {race_clock:.2f} {self.time_string}", True, (0, 0, 0))
         dist_rect = dist.get_rect()
         dist_rect.topleft = (self.end_line + offset, py_rect.y + 40)
         vid_disp.blit(dist, dist_rect)
@@ -553,11 +554,10 @@ class simulationVideo:
       cv2_img = cv2_img.transpose([1, 0, 2])
       cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_RGB2BGR)
       self.out_vid.write(cv2_img)
-      
-      
+
+      frame_num += 1.0
       current_duration = frame_num / self.fps  
       race_clock = current_duration  * self.simulation_speed
-      frame_num += 1.0
       
       
       # Terminate based on duration or all reached the end.
