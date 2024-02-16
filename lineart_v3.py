@@ -45,7 +45,8 @@ import moviepy.editor
 from moviepy.editor import VideoFileClip, vfx
 
 class table():
-  def __init__(self, x = None, y = None, 
+  def __init__(self, 
+               x = None, y = None, 
                img_path = None, img_loc = None, 
                img_speed = None):
     
@@ -101,6 +102,30 @@ class table():
     else:
       self.img_speed = 0
   
+  def showTable(self, fun, domain, img_name=None):
+    """ creates a Table from a function and its domain, and it saves it to img_name.
+    """
+    # Generate the x-values and y-values
+    x = sp.symbols('x')
+    y_values = []
+    x_values = np.linspace(*domain) # Unpack the list of elements.
+    for val in x_values:
+      y_values.append(float(fun.subs(x, val)))
+
+    # Create the labels:
+    self.column_labels = ["x", "y="+str(fun)]
+    
+    # Data
+    self.data_values = [x_values.tolist(), y_values]
+    
+    # Plot the table
+    self.plotTable()
+
+    # Save the image
+    if (img_name is not None):
+      self.saveImage(img_name)
+
+
   def saveImage(self, filename):
       """ saveImage(filename) saves filename.ext where ext=png, jpeg, svg, pdf
       """
@@ -117,7 +142,12 @@ class table():
       self.fig.layout = {}
 
       # Add the table plot
-      self.fig.add_trace(go.Table(header=dict(values = self.column_labels), cells = dict(values = self.data_values)) )
+      print(self.column_labels)
+      print(self.data_values)
+
+      self.fig.add_trace(go.Table(header=dict(values = self.column_labels), 
+                                  cells = dict(values = self.data_values,
+                                               format=[".5f", ".5f"])))
       
       # Update the layout
       self.fig.update_layout(autosize = False)
@@ -588,6 +618,15 @@ class simulationVideo:
 
 
 def CreateVideo(video_name, file_list, fps, durations):
+  # Check array lengths:
+  if (len(durations) != len(file_list)):
+    print("The lists are of different lengths!")
+    print("The number of elements in file_list = ", len(file_list))
+    print("The number of elements in durations = ", len(durations))
+    print("I cannot create the video until this is fixed!")
+    return
+
+
   #self.plot_to_frame()
   height_list  = []
   width_list   = []
