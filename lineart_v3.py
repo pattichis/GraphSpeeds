@@ -145,9 +145,21 @@ class table():
       print(self.column_labels)
       print(self.data_values)
 
+      print(len(self.column_labels)) 
+      print(len(self.data_values))
+
+      # Generate the format string.
+      format_vals = []
+      for vals in self.data_values:
+        if isinstance(vals[0], str):
+          format_vals.append("text")
+        else:
+          format_vals.append(".5f")
+      print(format_vals)
+
       self.fig.add_trace(go.Table(header=dict(values = self.column_labels), 
                                   cells = dict(values = self.data_values,
-                                               format=[".5f", ".5f"])))
+                                               format=format_vals)))
       
       # Update the layout
       self.fig.update_layout(autosize = False)
@@ -356,7 +368,7 @@ class simulationVideo:
     self.speed_string    = speed_string
 
 
-  def set_video(self, video_name="race.mp4", fps=10, vid_width=800, vid_height=600, 
+  def set_video(self, video_name="race.mp4", fps=30, vid_width=800, vid_height=600, 
                 max_frames=500, target_width=100, simulation_speed=1.0):
     """ Setup the video simulation parameters. Default values are provided.
     """
@@ -500,18 +512,23 @@ class simulationVideo:
 
     # Set the offset off the end line:
     offset = 20
-        
+
+    # Update pygame display for each table
+    stop = np.full(len(self.py_rects), False) 
+    stop_distances = np.full(len(self.py_rects), 0.0)
+    stop_times     = np.full(len(self.py_rects), 0.0)
     while True:
       # Fill display with white color
       vid_disp.fill((255, 255, 255))
       
-      # Update pygame display for each table
-      stop = np.full(len(self.py_rects), False) 
       for py_idx, py_rect in enumerate(self.py_rects):
-        # Nulify image speed once reaching stop line
-        if py_rect.right >= self.end_line:
+        # Zero image speed once we reach reach the stop line
+        # Set up the stop_distance and stop_time if we reached the end for the first time
+        if ((not stop[py_idx]) and (race_clock*self.orig_speeds[py_idx] >= self.race_distance)):
           stop[py_idx] = True 
-        
+          stop_times[py_idx]     = race_clock
+          stop_distances[py_idx] = race_clock*self.orig_speeds[py_idx]
+
         # Place the character image
         vid_disp.blit(self.py_imgs[py_idx], py_rect)
         
@@ -532,7 +549,11 @@ class simulationVideo:
         
         # Overlay image distance on video display
         # distance = (py_rect.right - self.target_width)*self.pixel_distance
-        distance = race_clock * self.orig_speeds[py_idx]
+        if (stop[py_idx]):
+          distance = stop_distances[py_idx]
+        else:
+          distance = race_clock * self.orig_speeds[py_idx]
+
         dist = self.vid_disp_font.render(f"Distance: {distance:.2f} {self.distance_string}", 
                                          True, (0, 0, 0))
         dist_rect = dist.get_rect()
@@ -541,7 +562,12 @@ class simulationVideo:
         
         # Overlay time on video display
         # the_time = distance/self.orig_speeds[py_idx]
-        dist = self.vid_disp_font.render(f"Time: {race_clock:.2f} {self.time_string}", True, (0, 0, 0))
+        if (stop[py_idx]):
+          the_time = stop_times[py_idx]
+        else:
+          the_time = race_clock
+
+        dist = self.vid_disp_font.render(f"Time: {the_time:.2f} {self.time_string}", True, (0, 0, 0))
         dist_rect = dist.get_rect()
         dist_rect.topleft = (self.end_line + offset, py_rect.y + 40)
         vid_disp.blit(dist, dist_rect)
