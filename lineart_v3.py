@@ -291,7 +291,7 @@ class simulationVideo:
 
   Simulation parameters (required)
   --------------------------------
-  duration:         This is the amount of time to simulate.
+  duration:         This is the amount of time in seconds to simulate.
   race_distance:    This is the physical distance being simulated.
                     It can be in meters, feet, or any unit of distance.
   vid_title:        The name for the video. Default="Race".
@@ -311,9 +311,8 @@ class simulationVideo:
   vid_height: The number of rows in the video.
   max_frames: The maximum number of frames allowed for the video.
   target_width:     the target width for the downloaded character images.
-  simulation_speed: simulation_speed*duration represents the number
-                    of seconds used for creating the video.
-                    Default=1.0.
+  simulation_speed: simulation_speed gives the skip number of frames.
+                    Default=1.0. If simulation_speed=2, the frame rate is halved.
   """
 
   def __init__(self, tables, duration, race_distance, vid_title):
@@ -347,9 +346,19 @@ class simulationVideo:
         height_size = self.target_width * (height/width)
         img_size   = (self.target_width, height_size)
         py_img = pygame.transform.scale(py_img, img_size)
-        
-        py_rect = pygame.Rect(tbl.loc[0], tbl.loc[1], 
-                              py_img.get_width(), py_img.get_height())
+
+        # Check if it fits or not.
+        loc0_ok = (tbl.loc[0] >= 0) and (tbl.loc[0] + py_img.get_width() <= self.vid_width)
+        loc1_ok = (tbl.loc[1] + py_img.get_height() <= self.vid_height) and (tbl.loc[1] >= 0)
+        if (loc0_ok and loc1_ok):
+          py_rect = pygame.Rect(tbl.loc[0], tbl.loc[1], py_img.get_width(), py_img.get_height())
+        else:
+          print("ERROR in placing an image in the video!")
+          print("Table loc [0] = ", tbl.loc[0], ", Table loc [1] = ", tbl.loc[1])
+          print("Resized image width = ", py_img.get_width(), ", Resized image height = ", py_img.get_height())
+          print("Number of rows in the video = ", self.vid_height)
+          print("Number of columns in the video = ", self.vid_width)
+          return 
          
         py_imgs.append(py_img)
         py_rects.append(py_rect)
@@ -369,7 +378,7 @@ class simulationVideo:
 
 
   def set_video(self, video_name="race.mp4", fps=30, vid_width=800, vid_height=600, 
-                max_frames=500, target_width=100, simulation_speed=1.0):
+                max_frames=10000, target_width=100, simulation_speed=1.0):
     """ Setup the video simulation parameters. Default values are provided.
     """
     # Video dimension check
@@ -446,8 +455,10 @@ class simulationVideo:
     if (self.num_of_frames > self.max_frames):
         print("Too many frames!")
         print("num_of_frames = ", self.num_of_frames)
-        print("Reduce duration and run again.")
-        print("duration = ", self.duration)
+        print("duration = ", self.duration, " fps = ", self.fps, " simulation_speed = ", self.simulation_speed)
+        print("You should reduce duration, reduce fps, or increase simulation_speed")
+        print("You should run set_video() to do this!")
+        print("Then run create_video() again.")
         return 
 
     
